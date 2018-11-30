@@ -340,6 +340,7 @@ void listdir(SAD16 sad16,unsigned int sector){
 
 //cria entrada na tabela de entradas + alocação em data
 unsigned int allocFille(SAD16 sad16, char filePath[]){
+
     FILE *file= fopen(filePath,"rb");
     unsigned int entry;
     if(file==NULL){
@@ -517,10 +518,11 @@ int main() {
     unsigned int setorAtual=0;
     unsigned int setorAterior=0;
 
-    disk=fopen("/home/mhi/disco","rb+");
+    disk=fopen("/home/mhi/disco","wb+");
     if(disk==NULL){
         printf("Não foi possivel abrir o disco");
     } else{
+
         int op;
         SAD16 sad16;
         sad16.disk=disk;
@@ -530,21 +532,21 @@ int main() {
         Tabent tabent[sad16.boot.totalEntries];
         fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,disk);
         sad16.table=tabent;
-
-
+        fclose(disk);
+        fclose(sad16.disk);
 
         while(op!=0) {
-            printf("SAD-Sistema de Arquivos e Diretórios");
-            printf("(1) Formatar O disco");
-            printf("(2) Adicionar um arquivo ao diretório atual");
-            printf("(3) Listar Arquivos e diretórios");
-            printf("(4) Criar um subdiretório no diretório atual");
-            printf("(5) Copiar um Arquivo do diretório atual para um diretório do seu computador");
-            printf("(6) Ir para um subdiretório");
-            printf("(7) Voltar para o diretório Anterior");
-            printf("(8) ir para o root");
+            printf("\nSAD-Sistema de Arquivos e Diretórios\n");
+            printf("\n(1) Formatar O disco\n");
+            printf("\n(2) Adicionar um arquivo ao diretório atual\n");
+            printf("\n(3) Listar Arquivos e diretórios\n");
+            printf("\n(4) Criar um subdiretório no diretório atual\n");
+            printf("\n(5) Copiar um Arquivo do diretório atual para um diretório do seu computador\n");
+            printf("\n(6) Ir para um subdiretório\n");
+            printf("\n(7) Voltar para o diretório Anterior\n");
+            printf("\n(8) ir para o root\n");
             printf("\nSelecione uma das opçôes:");
-            scanf("%d",op);
+            scanf("%d",&op);
             if (op == 1) {
                 sad16.disk = fopen(diskPath, "wb+");
                 format(sad16.disk);
@@ -553,13 +555,15 @@ int main() {
                 sad16.disk = fopen(diskPath, "rb+");
                 unsigned int entry;
                 entry = allocFille(sad16, filePath);
-                printEntry(tabent[entry]);
-                createDirEntry(sad16, setorAtual, entry);
+//                printEntry(tabent[entry]);
+//                createDirEntry(sad16, setorAtual, entry);
 
             } else if (op == 3) {
                 sad16.disk = fopen(diskPath, "rb");
                 listdir(sad16, setorAtual);
-
+                char enter;
+                scanf("%c",&enter);
+                scanf("%c",&enter);
 
             } else if (op == 4) {
                 sad16.disk = fopen(diskPath, "rb+");

@@ -40,7 +40,7 @@ typedef struct Tabent{
 
 typedef struct Datanode{
     unsigned char staus; //setor vazio/cheio
-    char data[507]; // Caso pirmeiro nodo da cadeia de byte é nome do arquivo, se não dado do arqivo
+    unsigned char data[507]; // Caso pirmeiro nodo da cadeia de byte é nome do arquivo, se não dado do arqivo
     unsigned int sector; // proximo setor a ser lido, caso 0 ultimo setor
 }__attribute__ ((__packed__)) Datanode;
 
@@ -113,6 +113,9 @@ void setRootNode(FILE *disk,BootSAD boot){
     voidDirNode(&datadirnode);
     datadirnode.sector=0;
     datadirnode.staus=240;
+    for(int i=0;i<126;i++){
+        datadirnode.indexTable[i]=0;
+    }
     fwrite(&datadirnode,sizeof(struct DataDirnode),1,disk);
 }
 
@@ -135,7 +138,7 @@ void format(FILE *disk){
     unsigned int numberOfSector=0;
     scanf("%u",&numberOfSector);
 
-    char blank[512];
+    unsigned char blank[512];
     for(int i=0;i<512;i++){
         blank[i]=0;
     }
@@ -151,19 +154,6 @@ void format(FILE *disk){
     printBoot(boot);
 
     setRootEntry(disk);
-//    Tabent entradaRoot1;
-//    fseek(disk,16,SEEK_SET);
-//    printf("\nROOT\n");
-//    fread(&entradaRoot1, sizeof(Tabent),1,disk);
-//    printf("status: %x \n",entradaRoot1.status);
-//    printf("tamanho: %ld \n",entradaRoot1.totalSize);
-//    printf("setor: %d \n",entradaRoot1.sector);
-//        printf("hora: %d \n",entradaRoot1.hora);
-//        printf("min: %d \n",entradaRoot1.minuto);
-//    printf("dia: %d \n",entradaRoot1.dia);
-//    printf("mes: %d \n",entradaRoot1.mes);
-//    printf("ano: %d \n",entradaRoot1.ano);
-//    printf("setor: %u \n",entradaRoot1.sector);
 
     setRootNode(disk,boot);
 
@@ -182,23 +172,24 @@ void searchFreeDataBlock(SAD16 sad16, unsigned int *sectors, int nsectors){
     fseek(sad16.disk, 16+(sad16.boot.totalEntries*16), SEEK_SET);
     Datanode data;
     int setoresencontrados=0;
-    for(unsigned int i=0;i<numofdatasectors;i++){
+//    printf("Nsectors %d\n",nsectors);
+    for(unsigned int i=0;i<=numofdatasectors;i++){
 
         fread(&data, sizeof(data),1,sad16.disk);
 //        printf("%u %d %lu\n",i,data.staus, ftell(sad16.disk));
 
         if((data.staus==0)&&(setoresencontrados<nsectors)){
             sectors[setoresencontrados]=i;
+//            printf("%u %u ",i,setoresencontrados);
             setoresencontrados++;
-        }else
-            fseek(sad16.disk,512,SEEK_CUR);
+        }
 
-        if(setoresencontrados==(nsectors-1))
+        if(setoresencontrados==nsectors)
             break;
     }
 }
 
-void createNewEntry(SAD16 sad16,char type, unsigned long int totalsize, unsigned int sector){
+unsigned int createNewEntry(SAD16 sad16,char type, unsigned long int totalsize, unsigned int sector){
 
     time_t timer;
     time(&timer);
@@ -219,6 +210,7 @@ void createNewEntry(SAD16 sad16,char type, unsigned long int totalsize, unsigned
 
     unsigned int entry=0;
     for(unsigned int i=0;i<sad16.boot.totalEntries;i++){
+        printf("|i:%u status:%x| ",i,sad16.table[i].status);
         if(sad16.table[i].status==0){
             entry=i;
             break;
@@ -227,11 +219,14 @@ void createNewEntry(SAD16 sad16,char type, unsigned long int totalsize, unsigned
     if(entry!=0){
         fseek(sad16.disk,(16+(entry*16)),SEEK_SET);
         fwrite(&entrada, sizeof(Tabent),1,sad16.disk);
+        sad16.table[entry]=entrada;
         printf("entrada Escrita em %u\n",entry);
+        return entry;
     } else {
         printf("Não há entradas vazias\n");
+        return 0;
     }
-//    fclose(sad16.disk);
+
 }
 
 char *file_from_path (char *pathname) {
@@ -245,64 +240,371 @@ void insertFilledata(SAD16 sad16,FILE *fille,char *name, unsigned int *sectors,u
     printf("-----------------");
     Datanode data;
 
-    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16)+(data.sector*512);
-
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    printf("\n%lu\n",nsector);
+    printf("\nsectors %d\n", sectors[nsector-1]);
+    fseek(fille,0, SEEK_SET);
+//    char dados[507];
+//    fread(&dados, 1 , 507,fille);
+    for(int i=0;i<507;i++){
+        data.data[i]=0;
+    }
     for(unsigned int i=0;i<nsector;i++){
-        fseek(sad16.disk,dataDesloc+(512)*sectors[i],SEEK_SET);
-        fseek(fille,0, SEEK_SET);
-        printf("%lu",ftell(sad16.disk));
+        fseek(sad16.disk,dataDesloc+(sectors[i]*512),SEEK_SET);
+
+        printf("%lu \n",ftell(sad16.disk));
         data.staus=15;
         data.sector=sectors[i+1];
-        if(i=0){
+        if(i==0){
             strcpy(data.data,name);
-        } else{
-            fread(&data.sector, sizeof(char), 507,fille);
-        }
-        if(i==nsector-1){
+//            printf("%s\n",data.data);
+
+        } else if(i==nsector-1){
             data.sector=0;
+            for(int j=0;j<507;j++)
+                data.data[j]=0;
+
+            unsigned long int atual = ftell(fille);
+
+            fseek(fille,0,SEEK_END);
+            unsigned long int ultimo = ftell(fille);
+
+            unsigned long int lastsize = ultimo-atual;
+
+//            printf("\ntotal:%lu\n",ultimo);
+//
+//            printf("\nponteiro local:%lu\n",atual);
+//
+//            printf("\n ultimo pedaço:%lu\n",lastsize);
+            fseek(fille,atual,SEEK_SET);
+
+            fread(data.data, sizeof(char), lastsize ,fille);
+            printf("\nstring de data %s %lu\n",data.data,lastsize);
+
+        }else{
+            fread(data.data, sizeof(char), 507,fille);
         }
         fwrite(&data, sizeof(Datanode),1,sad16.disk);
-        printf("dsadas");
+        printf("%u ",i);
     }
 
 }
 void printName(SAD16 sad16, unsigned int sectorHead){
     unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16)+(sectorHead*512);
     Datanode data;
+    fseek(sad16.disk,dataDesloc,SEEK_SET);
     fread(&data, sizeof(Datanode),1,sad16.disk);
-//    printf("dsa%s",data.data[507]);
+    if(data.staus==240)
+        printf("<Dir>\t");
+    else
+        printf("<File>\t");
+    printf("%lu %s\n",dataDesloc,data.data);
+}
+void printEntry(Tabent tabent){
+
+    printf("status: %x \n",tabent.status);
+    printf("tamanho: %ld \n",tabent.totalSize);
+    printf("setor: %d \n",tabent.sector);
+    printf("dia: %d \n",tabent.dia);
+    printf("mes: %d \n",tabent.mes);
+    printf("ano: %d \n",tabent.ano);
+    printf("setor: %u \n",tabent.sector);
+
 }
 
 
+
+void listdir(SAD16 sad16,unsigned int sector){
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(sector*512),SEEK_SET);
+    DataDirnode dataDirnode;
+    fread(&dataDirnode, sizeof(dataDirnode),1,sad16.disk);
+    int i=0;
+    unsigned int sectorName = sad16.table[dataDirnode.indexTable[i]].sector;
+    if(dataDirnode.indexTable[0]==0){
+        printf("Diretório Vazio\n");
+        return;
+    } else{
+        printf("\n(%d) ",i);
+        printName(sad16,sectorName);
+    }
+    i++;
+    while(dataDirnode.indexTable[i]!=0){
+        printf("\n(%d) ",i);
+        sectorName = sad16.table[dataDirnode.indexTable[i]].sector;
+        printName(sad16,sectorName);
+        i++;
+    }
+}
+
+
+//cria entrada na tabela de entradas + alocação em data
+unsigned int allocFille(SAD16 sad16, char filePath[]){
+    FILE *file= fopen(filePath,"rb");
+    unsigned int entry;
+    if(file==NULL){
+        printf("Não foi possivel abrir %s",filePath);
+    } else{
+        fseek(file,0,SEEK_END);
+        unsigned int sector=0;
+        unsigned long int nsector=(ftell(file)/507)+1;
+        printf("%u",nsector);
+        if((ftell(file)%512)!=0){
+            nsector++;
+        }
+        unsigned int sectors[nsector];
+
+        searchFreeDataBlock(sad16,sectors,nsector);
+        entry=createNewEntry(sad16,'F',ftell(file),sectors[0]);
+
+        insertFilledata(sad16,file,file_from_path(filePath),sectors,nsector);
+
+        fclose(file);
+    }
+    return entry;
+}
+
+//MAX 126 entradas por diretório;
+void createDirEntry(SAD16 sad16, unsigned int setorAtual, unsigned int index){
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(setorAtual*512),SEEK_SET);
+    DataDirnode dataDirnode;
+    fread(&dataDirnode, sizeof(DataDirnode),1,sad16.disk);
+    for(int i=0;i<126;i++){
+        if(dataDirnode.indexTable[i]==0){
+            dataDirnode.indexTable[i]=index;
+            //reescrevendo o node com a entrada nova
+            fseek(sad16.disk,dataDesloc+(setorAtual*512),SEEK_SET);
+            fwrite(&dataDirnode, sizeof(DataDirnode),1,sad16.disk);
+            break;
+        }
+    }
+}
+
+unsigned int createNewDir(SAD16 sad16,char *name){
+    unsigned int sectors[2];
+    DataDirnode dataDirnode;
+    Datanode nameNode;
+    searchFreeDataBlock(sad16,sectors,2);
+
+    for(int i=0;i<507;i++){
+        if(i<126){
+            dataDirnode.indexTable[i]=0;
+        }
+        nameNode.data[i]=0;
+    }
+
+    dataDirnode.sector=0;
+    dataDirnode.staus=240;
+
+    nameNode.staus=240;
+    nameNode.sector=sectors[1];
+    stpcpy(nameNode.data,name);
+
+    unsigned int index;
+
+    index=createNewEntry(sad16,'D',0,sectors[0]);
+
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,(dataDesloc+(sectors[0]*512)),SEEK_SET);
+    fwrite(&nameNode, sizeof(Datanode),1,sad16.disk);
+
+    fseek(sad16.disk,(dataDesloc+(sectors[1]*512)),SEEK_SET);
+    fwrite(&dataDirnode, sizeof(DataDirnode),1,sad16.disk);
+
+    return index;
+}
+
+
+unsigned int getQtdO(SAD16 sad16,unsigned int sector){
+
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(sector*512),SEEK_SET);
+    DataDirnode dataDirnode;
+    fread(&dataDirnode, sizeof(dataDirnode),1,sad16.disk);
+
+    unsigned int i=0;
+    while(dataDirnode.indexTable[i]!=0)
+        i++;
+
+    return i;
+
+}
+
+void getListO(SAD16 sad16, unsigned int *list, unsigned int qtdo, unsigned int sector){
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(sector*512),SEEK_SET);
+    DataDirnode dataDirnode;
+    fread(&dataDirnode, sizeof(dataDirnode),1,sad16.disk);
+
+    unsigned int i=0;
+
+    while(dataDirnode.indexTable[i]!=0){
+//        printf("\n(%d) ",i);
+        list[i] = sad16.table[dataDirnode.indexTable[i]].sector;
+        i++;
+    }
+
+}
+
+
+unsigned int getDirSector(SAD16 sad16,unsigned int sector){
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(sector*512),SEEK_SET);
+    Datanode datanode;
+    fread(&datanode, sizeof(Datanode),1,sad16.disk);
+    printf("\n%s\n",datanode.data);
+    return datanode.sector;
+}
+
+void copyout(SAD16 sad16,Tabent tableEntry,char *path){
+
+    printEntry(tableEntry);
+
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(tableEntry.sector*512),SEEK_SET);
+    unsigned int setores =  (tableEntry.totalSize/512)+1;
+    unsigned long int ultimaparte =(tableEntry.totalSize%512);
+    if(ultimaparte>0){
+        setores++;
+    }
+    Datanode datanode;
+    fread(&datanode, sizeof(Datanode),1,sad16.disk);
+
+    char path2[507];
+    strcat(path2,path);
+    strcat(path2,datanode.data);
+
+    printf("%s",path2);
+
+    FILE *file = fopen(path2,"wb+");
+    fseek(file,0,SEEK_SET);
+//
+    for(int i=0;i<setores-2;i++){
+        printf("dsa");
+        fseek(sad16.disk,dataDesloc+(datanode.sector*512),SEEK_SET);
+        fread(&datanode, sizeof(Datanode),1,sad16.disk);
+        fwrite(datanode.data, sizeof(char), sizeof(datanode.data),file);
+    }
+    fseek(sad16.disk,dataDesloc+(datanode.sector*512),SEEK_SET);
+    fread(&datanode, sizeof(Datanode),1,sad16.disk);
+    fwrite(datanode.data, sizeof(char), ultimaparte,file);
+    fclose(file);
+}
+
+
+void getListofTE(SAD16 sad16, Tabent *list, unsigned int qtdo, unsigned int setorAtual){
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(setorAtual*512),SEEK_SET);
+    DataDirnode dataDirnode;
+    fread(&dataDirnode, sizeof(dataDirnode),1,sad16.disk);
+
+    unsigned int i=0;
+
+    while(dataDirnode.indexTable[i]!=0){
+//        printf("\n(%d) ",i);
+        list[i] = sad16.table[dataDirnode.indexTable[i]];
+        i++;
+    }
+
+}
+
 int main() {
     FILE *disk;
-    FILE *test;
-    disk=fopen("/dev/sdb1","wb+");
-    test=fopen("/home/mhi/a.out","rb");
-    if(!disk&&!test){
+    char diskPath[]="/home/mhi/disco";
+    char filePath[]="/home/mhi/alfa.txt";
+    char exitPath[]="/home/mhi/saida/";
+    unsigned int setorAtual=0;
+    unsigned int setorAterior=0;
+
+    disk=fopen("/home/mhi/disco","rb+");
+    if(disk==NULL){
         printf("Não foi possivel abrir o disco");
     } else{
-        format(disk);
+        int op;
         SAD16 sad16;
         sad16.disk=disk;
         fseek(disk,0,SEEK_SET);
         fread(&sad16.boot, sizeof(BootSAD),1,disk);
+        printBoot(sad16.boot);
         Tabent tabent[sad16.boot.totalEntries];
         fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,disk);
         sad16.table=tabent;
-        fseek(test,0,SEEK_END);
-        unsigned int sector=0;
-        int nsector=ftell(test)/512;
-        if((ftell(test)%512)!=0){
-            nsector++;
+
+
+
+        while(scanf("%d",&op)!=0) {
+
+            if (op == 1) {
+                sad16.disk = fopen(diskPath, "wb+");
+                format(sad16.disk);
+
+            } else if (op == 2) {
+                sad16.disk = fopen(diskPath, "rb+");
+                unsigned int entry;
+                entry = allocFille(sad16, filePath);
+                printEntry(tabent[entry]);
+                createDirEntry(sad16, setorAtual, entry);
+
+            } else if (op == 3) {
+                sad16.disk = fopen(diskPath, "rb");
+                listdir(sad16, setorAtual);
+
+
+            } else if (op == 4) {
+                sad16.disk = fopen(diskPath, "rb+");
+                char name[507];
+                scanf("%s", &name);
+                unsigned int index;
+                index=createNewDir(sad16, name);
+                createDirEntry(sad16,setorAtual,index);
+
+            } else if(op==5){
+                sad16.disk = fopen(diskPath, "rb");
+                unsigned int selected;
+                listdir(sad16,setorAtual);
+                scanf("%u",&selected);
+
+                unsigned int qtde= getQtdO(sad16,setorAtual);
+                Tabent listTE[qtde];
+                getListofTE(sad16,listTE,qtde,setorAtual);
+                copyout(sad16,listTE[selected],exitPath);
+                printf("pronto");
+
+            } else if(op==6) {
+                sad16.disk = fopen(diskPath, "rb");
+                unsigned int qtdo = getQtdO(sad16,setorAtual);
+                unsigned int setoresNodiretorio[qtdo];
+                unsigned int selected;
+                for(int i=0;i<qtdo;i++)
+                    setoresNodiretorio[i]=0;
+
+                qtdo = getQtdO(sad16,setorAtual);
+                printf("%u",qtdo);
+                getListO(sad16,setoresNodiretorio,qtdo,setorAtual);
+                for(int i=0;i<qtdo;i++)
+                    printf("%u ",setoresNodiretorio[i]);
+                listdir(sad16,setorAtual);
+                scanf("%d",&selected);
+                selected = setoresNodiretorio[selected];
+                setorAtual=getDirSector(sad16,selected);
+                printf("\n%u\n",setorAtual);
+            } else if(op==7){
+                setorAtual = setorAterior;
+            }else if (op == 8) {
+//                unsigned int sectors[34];
+//                searchFreeDataBlock(sad16, sectors, 34);
+                for(int i=0; i<sad16.boot.totalEntries;i++)
+                    printf("|%d|",sad16.table[i].status);
+            }
+
+            fclose(sad16.disk);
         }
-        unsigned int sectors[nsector];
-        searchFreeDataBlock(sad16,sectors,nsector);
-        createNewEntry(sad16,'F',ftell(test),sectors[0]);
-        insertFilledata(sad16,test,file_from_path("/home/mhi/a.out"),sectors,ftell(test));
-        fseek(disk,0,SEEK_END);
-        printf("%lu",ftell(disk));
-//        printName(sad16,1);
+
+
+
+
+
     }
     return 0;
 }

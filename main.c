@@ -549,6 +549,8 @@ int main() {
     printf("\n(6) Ir para um subdiretório\n");
     printf("\n(7) Voltar para o diretório Anterior\n");
     printf("\n(8) ir para o root\n");
+    printf("\n(9) Menu de Comandos\n");
+    printf("\n(10) Validação de Arquivos e diretŕos\n");
 
     while (op!=0) {
         scanf("%d",&op);
@@ -556,9 +558,11 @@ int main() {
             format(diskPath);
             getchar();
         } else if(op==2){
-            char *filePath;//="/home/mhi/alfa.txt";
+            char filePath[507];//="/home/mhi/alfa.txt";
             printf("Digite caminho do arquivo a ser inserido ao sistema:");
             scanf("%s",filePath);
+            printf("%s",filePath);
+            getchar();
             SAD16 sad16;
             sad16.disk = fopen(diskPath, "rb+");
             fseek(sad16.disk,0,SEEK_SET);
@@ -613,6 +617,7 @@ int main() {
             sad16.table=tabent;
             unsigned int selected;
             listdir(sad16, setorAtual);
+            printf("Digite o index do arquivo a ser copiado:");
             scanf("%u", &selected);
 
             unsigned int qtde = getQtdO(sad16, setorAtual);
@@ -643,6 +648,7 @@ int main() {
             for(int i=0;i<qtdo;i++)
                 printf("%u ",setoresNodiretorio[i]);
             listdir(sad16,setorAtual);
+            printf("Digite o index do subdiretório a acessar:");
             scanf("%d",&selected);
             selected = setoresNodiretorio[selected];
             setorAtual=getDirSector(sad16,selected);
@@ -665,8 +671,51 @@ int main() {
             printf("\n(5) Copiar um Arquivo do diretório atual para um diretório do seu computador\n");
             printf("\n(6) Ir para um subdiretório\n");
             printf("\n(7) Voltar para o diretório Anterior\n");
-            printf("\n(8) ir para o root\n");
+            printf("\n(8) Ir para o root\n");
+            printf("\n(9) Menu de Comandos\n");
+            printf("\n(10) Validação de Arquivos e diretŕos\n");
         } else if(op==10){
+            SAD16 sad16;
+            sad16.disk = fopen(diskPath, "rb+");
+            fseek(sad16.disk,0,SEEK_SET);
+            fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
+            Tabent tabent[sad16.boot.totalEntries];
+            fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
+            sad16.table=tabent;
+            unsigned int selected;
+            listdir(sad16, setorAtual);
+
+            scanf("%u", &selected);
+            unsigned int qtde = getQtdO(sad16, setorAtual);
+            printf(" %u ",qtde);
+            Tabent listTE[qtde];
+            getListofTE(sad16,listTE,qtde,setorAtual);
+            for(int i=0;i<qtde;i++){
+                printEntry(listTE[i]);
+                printf("\n");
+            }
+
+            Tabent averificar = listTE[selected];
+            printf("Tamnho do arquivo em bytes: %lu",averificar.totalSize);
+            printEntry(averificar);
+            unsigned long int nsetores = (averificar.totalSize / 507)+1;
+            unsigned long int resto = (averificar.totalSize % 507);
+            if(resto>0)
+                nsetores++;
+            printf("\nNumero de Setores a serem esperados a ser ocupados pelo arquivo: %lu\n",nsetores);
+            unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+            fseek(sad16.disk,dataDesloc+(averificar.sector*512),SEEK_SET);
+            Datanode datanode;
+            fread(&datanode, sizeof(Datanode),1,sad16.disk);
+            unsigned long int i=1;
+            while (datanode.sector!=0){
+                fread(&datanode, sizeof(Datanode),1,sad16.disk);
+                fseek(sad16.disk,dataDesloc+(datanode.sector*512),SEEK_SET);
+                i++;
+            }
+            printf("%lu",i);
+            if(i==nsetores)
+                printf("\n---Não há erros de Alocação do arquivo---\n");
 
         }
 

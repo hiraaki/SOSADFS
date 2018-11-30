@@ -61,7 +61,7 @@ typedef struct SAD16{
 
 
 void setBoot(FILE *disk, unsigned numbSectors){
-    unsigned int totalParcial= (numbSectors*0.05);
+    unsigned int totalParcial=(unsigned int) (numbSectors*0.05);
     unsigned int resto= ((16 + (totalParcial * 16)) % 512);
     unsigned int totalentradas=0;
     if(resto!=0){
@@ -93,9 +93,9 @@ void setRootEntry(FILE *disk){
     entradaRoot.sector=0; //primeiro setor da área de dados é o root
 //    entradaRoot.hora=timeinfo->tm_hour;
 //    entradaRoot.minuto=timeinfo->tm_min;
-    entradaRoot.dia=timeinfo->tm_mday;
-    entradaRoot.mes=timeinfo->tm_mon + 1;
-    entradaRoot.ano=timeinfo->tm_year;
+    entradaRoot.dia=(unsigned char)timeinfo->tm_mday;
+    entradaRoot.mes=(unsigned char)(timeinfo->tm_mon + 1);
+    entradaRoot.ano=(unsigned char)timeinfo->tm_year;
     fwrite(&entradaRoot, sizeof(Tabent),1,disk);
 //    printf("Root Entry seted");
 }
@@ -160,7 +160,7 @@ void format(FILE *disk){
     fseek(disk, 16+(boot.totalEntries*16), SEEK_SET);
     struct DataDirnode dirnode;
     fread(&dirnode, sizeof(struct DataDirnode),1,disk);
-    printf("Status:%x  Ofsset%u\n",dirnode.staus,ftell(disk));
+    printf("Status:%x  Ofsset%lu\n",dirnode.staus,ftell(disk));
     printDirIndex(dirnode);
 }
 
@@ -252,7 +252,7 @@ void insertFilledata(SAD16 sad16,FILE *fille,char *name, unsigned int *sectors,u
     for(unsigned int i=0;i<nsector;i++){
         fseek(sad16.disk,dataDesloc+(sectors[i]*512),SEEK_SET);
 
-        printf("%lu \n",ftell(sad16.disk));
+//        printf("%lu \n",ftell(sad16.disk));
         data.staus=15;
         data.sector=sectors[i+1];
         if(i==0){
@@ -279,13 +279,13 @@ void insertFilledata(SAD16 sad16,FILE *fille,char *name, unsigned int *sectors,u
             fseek(fille,atual,SEEK_SET);
 
             fread(data.data, sizeof(char), lastsize ,fille);
-            printf("\nstring de data %s %lu\n",data.data,lastsize);
+//            printf("\nstring de data %s %lu\n",data.data,lastsize);
 
         }else{
             fread(data.data, sizeof(char), 507,fille);
         }
         fwrite(&data, sizeof(Datanode),1,sad16.disk);
-        printf("%u ",i);
+//        printf("%u ",i);
     }
 
 }
@@ -533,8 +533,18 @@ int main() {
 
 
 
-        while(scanf("%d",&op)!=0) {
-
+        while(op!=0) {
+            printf("SAD-Sistema de Arquivos e Diretórios");
+            printf("(1) Formatar O disco");
+            printf("(2) Adicionar um arquivo ao diretório atual");
+            printf("(3) Listar Arquivos e diretórios");
+            printf("(4) Criar um subdiretório no diretório atual");
+            printf("(5) Copiar um Arquivo do diretório atual para um diretório do seu computador");
+            printf("(6) Ir para um subdiretório");
+            printf("(7) Voltar para o diretório Anterior");
+            printf("(8) ir para o root");
+            printf("\nSelecione uma das opçôes:");
+            scanf("%d",op);
             if (op == 1) {
                 sad16.disk = fopen(diskPath, "wb+");
                 format(sad16.disk);
@@ -589,13 +599,15 @@ int main() {
                 selected = setoresNodiretorio[selected];
                 setorAtual=getDirSector(sad16,selected);
                 printf("\n%u\n",setorAtual);
+
             } else if(op==7){
                 setorAtual = setorAterior;
             }else if (op == 8) {
 //                unsigned int sectors[34];
 //                searchFreeDataBlock(sad16, sectors, 34);
-                for(int i=0; i<sad16.boot.totalEntries;i++)
-                    printf("|%d|",sad16.table[i].status);
+//                for(int i=0; i<sad16.boot.totalEntries;i++)
+//                    printf("|%d|",sad16.table[i].status);
+                setorAtual = 0;
             }
 
             fclose(sad16.disk);

@@ -539,12 +539,13 @@ unsigned long int anDirSize(SAD16 sad16, unsigned int sector){
     numOfEntryes=getListofTE(sad16,tabentToAnalize,sector);
 
     unsigned long int totalsize=0;
-
+//    printf("\n%lu\n",numOfEntryes);
     for(int i=0;i<numOfEntryes;i++){
 
         if(tabentToAnalize[i].status==15){
 
             totalsize+=tabentToAnalize[i].totalSize;
+            printEntry(tabentToAnalize[i]);
 
         } else if(tabentToAnalize[i].status==240){
             unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
@@ -556,7 +557,6 @@ unsigned long int anDirSize(SAD16 sad16, unsigned int sector){
             fread(&datanode, sizeof(datanode),1,sad16.disk);
 
             totalsize += anDirSize(sad16,datanode.sector);
-
 
         }
     }
@@ -575,14 +575,51 @@ void updateDirSize(SAD16 sad16, unsigned int setor){
         }
     }
     if(tabent==NULL){
-        printf("Diretório não Encontrado");
+        printf("\nDiretório não Encontrado\n");
     } else{
         tabent->totalSize = anDirSize(sad16,setor);
         fseek(sad16.disk,16,SEEK_SET);
         fwrite(sad16.table, sizeof(Tabent), sizeof(sad16.boot.totalEntries),sad16.disk);
     }
+}
+
+
+void validarArquivo(SAD16 sad16,Tabent averificar){
+    unsigned long int nsetores = (averificar.totalSize / 507)+1;
+    unsigned long int resto = (averificar.totalSize % 507);
+    if(resto>0)
+        nsetores++;
+    printf("\nNumero de Setores a serem esperados a ser ocupados pelo arquivo: %lu\n",nsetores);
+    unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+    fseek(sad16.disk,dataDesloc+(averificar.sector*512),SEEK_SET);
+    Datanode datanode;
+    fread(&datanode, sizeof(Datanode),1,sad16.disk);
+    printf("Verificando o arquivo %s/n",datanode.data);
+    unsigned long int i=1;
+    while (datanode.sector!=0){
+        if(((i+1)>=nsetores)&&(datanode.sector!=0)){
+            printf("Erro:A Alocção do arquivo Possui Problemas\n");
+            i++;
+            break;
+        } else{
+            fread(&datanode, sizeof(Datanode),1,sad16.disk);
+            fseek(sad16.disk,dataDesloc+(datanode.sector*512),SEEK_SET);
+            i++;
+        }
+
+    }
+    printf("%lu",i);
+    if(i==nsetores)
+        printf("\n---Não há erros de Alocação do arquivo---\n");
+    else{
+
+        printf("Definindo o setor atual como ultimo Setor do Arquivo\n");
+    }
 
 }
+
+
+
 
 int main() {
 
@@ -755,49 +792,11 @@ int main() {
             printf("\n(7) Voltar para o diretório Anterior\n");
             printf("\n(8) Ir para o root\n");
             printf("\n(9) Menu de Comandos\n");
-            printf("\n(10) Validação de Arquivos e diretŕos\n");
+            printf("\n(10) Menu de validação Arquivos e diretŕos\n");
         } else if(op==10){
-            SAD16 sad16;
-            sad16.disk = fopen(diskPath, "rb+");
-            fseek(sad16.disk,0,SEEK_SET);
-            fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
-            Tabent tabent[sad16.boot.totalEntries];
-            fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
-            sad16.table=tabent;
-            unsigned int selected;
-            listdir(sad16, setorAtual);
+            printf("\n(11) Checar a alocação de um arquivo\n");
+            printf("\n(12) Checar o tamanho do diretório atual\n");
 
-            scanf("%u", &selected);
-            unsigned int qtde = getQtdO(sad16, setorAtual);
-            printf(" %u ",qtde);
-            Tabent listTE[qtde];
-            getListofTE(sad16,listTE,setorAtual);
-            for(int i=0;i<qtde;i++){
-                printEntry(listTE[i]);
-                printf("\n");
-            }
-
-            Tabent averificar = listTE[selected];
-            printf("Tamnho do arquivo em bytes: %lu",averificar.totalSize);
-            printEntry(averificar);
-            unsigned long int nsetores = (averificar.totalSize / 507)+1;
-            unsigned long int resto = (averificar.totalSize % 507);
-            if(resto>0)
-                nsetores++;
-            printf("\nNumero de Setores a serem esperados a ser ocupados pelo arquivo: %lu\n",nsetores);
-            unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
-            fseek(sad16.disk,dataDesloc+(averificar.sector*512),SEEK_SET);
-            Datanode datanode;
-            fread(&datanode, sizeof(Datanode),1,sad16.disk);
-            unsigned long int i=1;
-            while (datanode.sector!=0){
-                fread(&datanode, sizeof(Datanode),1,sad16.disk);
-                fseek(sad16.disk,dataDesloc+(datanode.sector*512),SEEK_SET);
-                i++;
-            }
-            printf("%lu",i);
-            if(i==nsetores)
-                printf("\n---Não há erros de Alocação do arquivo---\n");
 
         } else if(op==11){
             SAD16 sad16;
@@ -807,7 +806,68 @@ int main() {
             Tabent tabent[sad16.boot.totalEntries];
             fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
             sad16.table=tabent;
-            printf("Tamanho Total do Diretório atual %lu",anDirSize(sad16,setorAtual));
+            unsigned int selected;
+            listdir(sad16, setorAtual);
+            printf("\nDigite o index do arquivo no diretório:");
+            scanf("%u", &selected);
+            unsigned int qtde = getQtdO(sad16, setorAtual);
+            printf(" %u ",qtde);
+            Tabent listTE[qtde];
+            getListofTE(sad16,listTE,setorAtual);
+//            for(int i=0;i<qtde;i++){
+//                printEntry(listTE[i]);
+//                printf("\n");
+//            }
+
+            Tabent averificar = listTE[selected];
+            validarArquivo(sad16,averificar);
+            printf("Tamnho do arquivo em bytes: %lu",averificar.totalSize);
+            printEntry(averificar);
+
+            fclose(sad16.disk);
+
+        } else if(op==12){
+            SAD16 sad16;
+            sad16.disk = fopen(diskPath, "rb+");
+            fseek(sad16.disk,0,SEEK_SET);
+            fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
+            Tabent tabent[sad16.boot.totalEntries];
+            fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
+            sad16.table=tabent;
+
+            unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+
+            unsigned long int tamanhoEncontrado =  anDirSize(sad16,setorAtual);
+            Tabent *tabent1=NULL;
+            for(int i=0;i<sad16.boot.totalEntries;i++){
+
+                fseek(sad16.disk,dataDesloc+(tabent[i].sector*512),SEEK_SET);
+                Datanode datanode;
+                fread(&datanode, sizeof(datanode), 1 , sad16.disk);
+
+                if(datanode.sector==setorAtual){
+                    printEntry(tabent[i]);
+                    printf("entrou nesta merda %u",setorAtual);
+                    tabent1=&tabent[i];
+                    break;
+                }
+            }
+            if(tabent1==NULL){
+                printf("nun deu certo");
+                return 512;
+            }
+
+            if(tamanhoEncontrado!=tabent1->totalSize){
+                printf("\nTamanho do Diretório Calculado é %lu diferente do atual %lu\n",tamanhoEncontrado,tabent1->totalSize);
+                printf("\ncorrigidno para %lu\n",tamanhoEncontrado);
+                tabent1->totalSize=tamanhoEncontrado;
+            } else{
+                printf("\nTamanho do diretório está consistente\n");
+                printf("\nTamanho Total do Diretório atual %lu\n",tabent1->totalSize);
+            }
+            fseek(sad16.disk,16,SEEK_SET);
+            fwrite(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
+            fclose(sad16.disk);
         }
 
 

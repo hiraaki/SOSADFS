@@ -379,20 +379,20 @@ void createDirEntry(SAD16 sad16, unsigned int setorAtual, unsigned int index){
     printf("setor atual:%u",setorAtual);
 
     unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
-    printf(" datadesloc:%lu ",dataDesloc);
+   // printf(" datadesloc:%lu ",dataDesloc);
     fseek(sad16.disk,dataDesloc+(setorAtual*512),SEEK_SET);
     DataDirnode dataDirnode;
     fread(&dataDirnode, sizeof(DataDirnode),1,sad16.disk);
 
     for(int i=0;i<126;i++){
         if(dataDirnode.indexTable[i]==0){
-            printf("%u",i);
+            //printf("%u",i);
             dataDirnode.indexTable[i]=index;
             //reescrevendo o node com a entrada nova
             fseek(sad16.disk,dataDesloc+(setorAtual*512)+1+(i* sizeof(unsigned int)),SEEK_SET);
-            printf(" %u",index);
-            printf("desl %lu ",ftell(sad16.disk));
-            printDirIndex(dataDirnode);
+           // printf(" %u",index);
+           // printf("desl %lu ",ftell(sad16.disk));
+         //   printDirIndex(dataDirnode);
             fwrite(&dataDirnode.indexTable[i], sizeof(unsigned int),1,sad16.disk);
             break;
         }
@@ -471,7 +471,7 @@ unsigned int getDirSector(SAD16 sad16,unsigned int sector){
     fseek(sad16.disk,dataDesloc+(sector*512),SEEK_SET);
     Datanode datanode;
     fread(&datanode, sizeof(Datanode),1,sad16.disk);
-    printf("\n%s\n",datanode.data);
+//    printf("\n%s\n",datanode.data);
     return datanode.sector;
 }
 
@@ -513,7 +513,7 @@ void copyout(SAD16 sad16,Tabent tableEntry,char *path){
 }
 
 
-void getListofTE(SAD16 sad16, Tabent *list, unsigned int qtdo, unsigned int setorAtual){
+unsigned int getListofTE(SAD16 sad16, Tabent *list, unsigned int setorAtual){
     unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
     fseek(sad16.disk,dataDesloc+(setorAtual*512),SEEK_SET);
     DataDirnode dataDirnode;
@@ -526,8 +526,42 @@ void getListofTE(SAD16 sad16, Tabent *list, unsigned int qtdo, unsigned int seto
         list[i] = sad16.table[dataDirnode.indexTable[i]];
         i++;
     }
+    return i;
 }
-void validarArquivo(){
+
+
+
+
+
+unsigned long int anDirSize(SAD16 sad16, unsigned int sector){
+    Tabent tabentToAnalize[126];
+    unsigned int numOfEntryes;
+    numOfEntryes=getListofTE(sad16,tabentToAnalize,sector);
+
+
+    unsigned long int totalsize=0;
+
+    for(int i=0;i<numOfEntryes;i++){
+
+        if(tabentToAnalize[i].status==15){
+
+            totalsize+=tabentToAnalize[i].totalSize;
+
+        } else if(tabentToAnalize[i].status==240){
+            unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
+            fseek(sad16.disk,dataDesloc+(tabentToAnalize[i].sector*512),SEEK_SET);
+
+            Datanode datanode;
+
+
+            fread(&datanode, sizeof(datanode),1,sad16.disk);
+
+
+            totalsize += anDirSize(sad16,datanode.sector);
+        }
+    }
+
+    return totalsize;
 
 }
 
@@ -535,7 +569,12 @@ int main() {
 
     char diskPath[]="/home/mhi/disco";
 
-    char exitPath[]="/home/mhi/saida/";
+
+    printf("Digite o caminho do Disco: ");
+    scanf("%s",&diskPath);
+
+    while(fopen(diskPath,"rb")==NULL)
+        printf("Não foi possivel abir o disco");
 
     int op=-1;
     unsigned int setorAtual=0;
@@ -568,13 +607,13 @@ int main() {
             fseek(sad16.disk,0,SEEK_SET);
             fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
             Tabent tabent[sad16.boot.totalEntries];
-            printBoot(sad16.boot);
+            //printBoot(sad16.boot);
             fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
             sad16.table=tabent;
 
             unsigned int entry;
             entry = allocFille(sad16, filePath);
-            printEntry(tabent[entry]);
+            //printEntry(tabent[entry]);
             createDirEntry(sad16, setorAtual, entry);
             fclose(sad16.disk);
 
@@ -600,6 +639,7 @@ int main() {
             fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
             sad16.table=tabent;
 
+            printf("Digite o nome do diretório:");
             char name[507];
             scanf("%s", &name);
             unsigned int index;
@@ -616,16 +656,26 @@ int main() {
             fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
             sad16.table=tabent;
             unsigned int selected;
-            listdir(sad16, setorAtual);
+            //listdir(sad16, setorAtual);
             printf("Digite o index do arquivo a ser copiado:");
             scanf("%u", &selected);
 
+            char exitPath[]="/home/mhi/saida/";
+            printf("Digite o camiho do deitório o qual o arquivo vai ser colado:");
+            scanf("%s",&exitPath);
             unsigned int qtde = getQtdO(sad16, setorAtual);
 //            printf(" %u ",qtde);
             Tabent listTE[qtde];
-            getListofTE(sad16, listTE, qtde, setorAtual);
-            copyout(sad16, listTE[selected], exitPath);
-            printf("pronto");
+            getListofTE(sad16, listTE, setorAtual);
+
+            if(listTE[selected].status==15) {
+                copyout(sad16, listTE[selected], exitPath);
+                printf("pronto");
+            } else if(listTE[selected].status==240) {
+                printf("\nA entrada selecionada é um diretório não um arquivo.\n");
+            } else{
+                printf("\nEntrada Invalida!\n");
+            }
             fclose(sad16.disk);
         }else if(op==6) {
             setorAnterior = setorAtual;
@@ -651,8 +701,21 @@ int main() {
             printf("Digite o index do subdiretório a acessar:");
             scanf("%d",&selected);
             selected = setoresNodiretorio[selected];
-            setorAtual=getDirSector(sad16,selected);
-            printf("\n%u\n",setorAtual);
+            unsigned int aux;
+            aux=getDirSector(sad16,selected);
+            fseek(sad16.disk,(16+(sad16.boot.totalEntries*16)+(512*aux)),SEEK_SET);
+            DataDirnode dataDirnode;
+            fread(&dataDirnode, sizeof(DataDirnode),1,sad16.disk);
+            if(dataDirnode.staus==15){
+                printf("\nO index selecionado é um arquivo não um diretório\n");
+            } else if(dataDirnode.staus==240){
+                printf("\nPronto\n");
+                setorAnterior = setorAtual;
+                setorAtual = aux;
+            } else{
+                printf("\nEntrada Invalida\n");
+            }
+            //printf("\n%u\n",setorAtual);
             fclose(sad16.disk);
 
         }else if(op==7){
@@ -689,7 +752,7 @@ int main() {
             unsigned int qtde = getQtdO(sad16, setorAtual);
             printf(" %u ",qtde);
             Tabent listTE[qtde];
-            getListofTE(sad16,listTE,qtde,setorAtual);
+            getListofTE(sad16,listTE,setorAtual);
             for(int i=0;i<qtde;i++){
                 printEntry(listTE[i]);
                 printf("\n");
@@ -717,6 +780,16 @@ int main() {
             if(i==nsetores)
                 printf("\n---Não há erros de Alocação do arquivo---\n");
 
+        } else if(op==11){
+            SAD16 sad16;
+            sad16.disk = fopen(diskPath, "rb+");
+            fseek(sad16.disk,0,SEEK_SET);
+            fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
+            Tabent tabent[sad16.boot.totalEntries];
+            fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
+            sad16.table=tabent;
+
+            printf("%lu",anDirSize(sad16,setorAtual));
         }
 
 

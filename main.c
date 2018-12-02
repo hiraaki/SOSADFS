@@ -191,7 +191,7 @@ void searchFreeDataBlock(SAD16 sad16, unsigned int *sectors, int nsectors){
     for(unsigned int i=0;i<=numofdatasectors;i++){
 
         fread(&data, sizeof(data),1,sad16.disk);
-        printf("%u %d %lu\n",i,data.staus, ftell(sad16.disk));
+       // printf("%u %d %lu\n",i,data.staus, ftell(sad16.disk));
 
         if((data.staus==0)&&(setoresencontrados<nsectors)){
             sectors[setoresencontrados]=i;
@@ -350,7 +350,7 @@ unsigned int allocFille(SAD16 sad16, char filePath[]){
     FILE *file= fopen(filePath,"rb");
     unsigned int entry;
     if(file==NULL){
-        printf("Não foi possivel abrir %s",filePath);
+        printf("\nNão foi possivel abrir %s\n",filePath);
     } else{
         fseek(file,0,SEEK_END);
         unsigned int sector=0;
@@ -360,7 +360,7 @@ unsigned int allocFille(SAD16 sad16, char filePath[]){
             nsector++;
         }
         unsigned int sectors[nsector];
-        printf("\n setores calculados: %u \n",nsector);
+        //printf("\n setores calculados: %u \n",nsector);
         searchFreeDataBlock(sad16,sectors,nsector);
         entry=createNewEntry(sad16,'F',ftell(file),sectors[0]);
 
@@ -374,9 +374,9 @@ unsigned int allocFille(SAD16 sad16, char filePath[]){
 //MAX 126 entradas por diretório;
 void createDirEntry(SAD16 sad16, unsigned int setorAtual, unsigned int index){
     if(sad16.disk==NULL){
-        printf("dsadsadsadsdsadsaadsaddssaddsadas");
+        printf("Disco Desconectado!");
     }
-    printf("setor atual:%u",setorAtual);
+  //  printf("setor atual:%u",setorAtual);
 
     unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
    // printf(" datadesloc:%lu ",dataDesloc);
@@ -538,7 +538,6 @@ unsigned long int anDirSize(SAD16 sad16, unsigned int sector){
     unsigned int numOfEntryes;
     numOfEntryes=getListofTE(sad16,tabentToAnalize,sector);
 
-
     unsigned long int totalsize=0;
 
     for(int i=0;i<numOfEntryes;i++){
@@ -556,12 +555,32 @@ unsigned long int anDirSize(SAD16 sad16, unsigned int sector){
 
             fread(&datanode, sizeof(datanode),1,sad16.disk);
 
-
             totalsize += anDirSize(sad16,datanode.sector);
+
+
         }
     }
 
     return totalsize;
+
+}
+
+void updateDirSize(SAD16 sad16, unsigned int setor){
+    Tabent *tabent=NULL;
+
+    for(int i=0;i<sad16.boot.totalEntries;i++){
+        if(sad16.table[i].sector==setor){
+            tabent=&sad16.table[i];
+            break;
+        }
+    }
+    if(tabent==NULL){
+        printf("Diretório não Encontrado");
+    } else{
+        tabent->totalSize = anDirSize(sad16,setor);
+        fseek(sad16.disk,16,SEEK_SET);
+        fwrite(sad16.table, sizeof(Tabent), sizeof(sad16.boot.totalEntries),sad16.disk);
+    }
 
 }
 
@@ -598,9 +617,9 @@ int main() {
             getchar();
         } else if(op==2){
             char filePath[507];//="/home/mhi/alfa.txt";
-            printf("Digite caminho do arquivo a ser inserido ao sistema:");
+            printf("\nDigite caminho do arquivo a ser inserido ao sistema:");
             scanf("%s",filePath);
-            printf("%s",filePath);
+            //printf("%s",filePath);
             getchar();
             SAD16 sad16;
             sad16.disk = fopen(diskPath, "rb+");
@@ -788,8 +807,7 @@ int main() {
             Tabent tabent[sad16.boot.totalEntries];
             fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
             sad16.table=tabent;
-
-            printf("%lu",anDirSize(sad16,setorAtual));
+            printf("Tamanho Total do Diretório atual %lu",anDirSize(sad16,setorAtual));
         }
 
 

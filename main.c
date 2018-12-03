@@ -545,7 +545,7 @@ unsigned long int anDirSize(SAD16 sad16, unsigned int sector){
         if(tabentToAnalize[i].status==15){
 
             totalsize+=tabentToAnalize[i].totalSize;
-            printEntry(tabentToAnalize[i]);
+            //printEntry(tabentToAnalize[i]);
 
         } else if(tabentToAnalize[i].status==240){
             unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
@@ -629,8 +629,11 @@ int main() {
     printf("Digite o caminho do Disco: ");
     scanf("%s",&diskPath);
 
-    while(fopen(diskPath,"rb")==NULL)
+    while(fopen(diskPath,"rb")==NULL){
         printf("Não foi possivel abir o disco");
+        scanf("%s",&diskPath);
+    }
+
 
     int op=-1;
     unsigned int setorAtual=0;
@@ -673,10 +676,10 @@ int main() {
                 entry = allocFille(sad16, filePath);
                 //printEntry(tabent[entry]);
                 createDirEntry(sad16, setorAtual, entry);
+
+                updateDirSize(sad16,setorAtual);
                 fclose(sad16.disk);
             }
-
-
 
         } else if (op == 3) {
             SAD16 sad16;
@@ -843,23 +846,30 @@ int main() {
             unsigned long int dataDesloc = 16+(sad16.boot.totalEntries*16);
 
             unsigned long int tamanhoEncontrado =  anDirSize(sad16,setorAtual);
+
             Tabent *tabent1=NULL;
-            for(int i=0;i<sad16.boot.totalEntries;i++){
 
-                fseek(sad16.disk,dataDesloc+(tabent[i].sector*512),SEEK_SET);
-                Datanode datanode;
-                fread(&datanode, sizeof(datanode), 1 , sad16.disk);
+            if(setorAtual==0){
+                tabent1=&sad16.table[0];
+            } else {
 
-                if(datanode.sector==setorAtual){
-                    printEntry(tabent[i]);
+                for (int i = 0; i < sad16.boot.totalEntries; i++) {
 
-                    tabent1=&tabent[i];
-                    break;
+                    fseek(sad16.disk, dataDesloc + (tabent[i].sector * 512), SEEK_SET);
+                    Datanode datanode;
+                    fread(&datanode, sizeof(datanode), 1, sad16.disk);
+                    //printf("\n%u %u\n",datanode.sector,setorAtual);
+                    if (datanode.sector == setorAtual) {
+                        printf("\n%d\n", i);
+                        printEntry(tabent[i]);
+                        tabent1 = &tabent[i];
+                        break;
+                    }
                 }
-            }
-            if(tabent1==NULL){
-                printf("ErroCritico");
-                return 512;
+                if (tabent1 == NULL) {
+                    printf("ErroCritico");
+                    return 512;
+                }
             }
 
             if(tamanhoEncontrado!=tabent1->totalSize){

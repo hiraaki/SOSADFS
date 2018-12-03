@@ -657,21 +657,26 @@ int main() {
             printf("\nDigite caminho do arquivo a ser inserido ao sistema:");
             scanf("%s",filePath);
             //printf("%s",filePath);
-            getchar();
-            SAD16 sad16;
-            sad16.disk = fopen(diskPath, "rb+");
-            fseek(sad16.disk,0,SEEK_SET);
-            fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
-            Tabent tabent[sad16.boot.totalEntries];
-            //printBoot(sad16.boot);
-            fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
-            sad16.table=tabent;
+            FILE *teste=fopen(filePath,"rb");
+            if(teste!=NULL){
+                getchar();
+                SAD16 sad16;
+                sad16.disk = fopen(diskPath, "rb+");
+                fseek(sad16.disk,0,SEEK_SET);
+                fread(&sad16.boot, sizeof(BootSAD),1,sad16.disk);
+                Tabent tabent[sad16.boot.totalEntries];
+                //printBoot(sad16.boot);
+                fread(tabent, sizeof(Tabent),sad16.boot.totalEntries,sad16.disk);
+                sad16.table=tabent;
 
-            unsigned int entry;
-            entry = allocFille(sad16, filePath);
-            //printEntry(tabent[entry]);
-            createDirEntry(sad16, setorAtual, entry);
-            fclose(sad16.disk);
+                unsigned int entry;
+                entry = allocFille(sad16, filePath);
+                //printEntry(tabent[entry]);
+                createDirEntry(sad16, setorAtual, entry);
+                fclose(sad16.disk);
+            }
+
+
 
         } else if (op == 3) {
             SAD16 sad16;
@@ -847,13 +852,13 @@ int main() {
 
                 if(datanode.sector==setorAtual){
                     printEntry(tabent[i]);
-                    printf("entrou nesta merda %u",setorAtual);
+
                     tabent1=&tabent[i];
                     break;
                 }
             }
             if(tabent1==NULL){
-                printf("nun deu certo");
+                printf("ErroCritico");
                 return 512;
             }
 
